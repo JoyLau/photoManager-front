@@ -13,16 +13,17 @@
 
       <el-row :span="5" v-for="(o, index1) in 1" :key="o" >
         <el-col :span="5" v-for="(o, index) in total" :key="o" >
-          <el-card :body-style="{ padding: '0px' }" style="width: 300px;" shadow="hover">
+          <el-card :body-style="{ padding: '0px' }" style="width: 88%;" shadow="hover">
             <el-carousel :interval="3000" height="300px">
               <el-carousel-item v-if="list[index].carouselList.length !== 0" v-for="item in list[index].carouselList" :key="item.key">
-                <img :src="item.src" style="width: 100%;height: 100%" onclick="alert('查看图片')">
+                <img :src="item.src" style="width: 100%;height: 100%" >
               </el-carousel-item>
               <el-carousel-item v-if="list[index].carouselList.length === 0" v-for="item in defaultlList" :key="item.key">
-                <img :src="item.src" style="width: 100%;height: 100%" onclick="alert('查看图片')">
+                <img :src="item.src" style="width: 100%;height: 100%" >
               </el-carousel-item>
             </el-carousel>
-            <div style="text-align: center; color: pink;margin-top: 2%;cursor: pointer;text-decoration: underline; " title="查看相册" onclick="alert('点击相册')">{{list[index].photoName}}</div>
+            <el-button @click="openLookPhoto(list[index])" style="width: 100%;" type="primary" title="查看相册">{{list[index].photoName}}
+            </el-button>
             <div style="text-align: center; color: pink;margin-top: 2%">{{list[index].gmtCreate}}</div>
             <div style="text-align: center; color: pink;margin-top: 2%">{{list[index].photoDesc}}</div>
           </el-card>
@@ -38,6 +39,22 @@
                      layout="total, prev, pager, next, jumper" :total="total" >
       </el-pagination>
     </div>
+
+    <el-dialog title="查看相册" :visible.sync="isLook" width="60%" :before-close="cancelLook" desc="查看相册框">
+        <el-row>
+          <el-col :span="6" v-for="(o, photo) in photoList.length">
+            <div style="color: gray;size: letter;width: 100%;">
+              <span>删除</span>
+            </div>
+            <el-card :body-style="{ padding: '0px' }" style="width: 90%;" shadow="hover" :key="photoList[photo].id">
+              <img :src="photoList[photo].imageUrl" style="width: 100%;height: 250px;" >
+            </el-card>
+          </el-col>
+          <el-col :span="10" :offset="10">
+            <el-button @click="cancelLook" width="100%" type="primary">退出</el-button>
+          </el-col>
+        </el-row>
+    </el-dialog>
 
     <el-dialog :title="dialogTitle" :visible.sync="isDialog" width="60%" :before-close="cancel" desc="新增或编辑框">
       <el-form label-width="110px" :model="dialogData" ref="dialogData" :rules="rules">
@@ -79,6 +96,7 @@
 
 <script>
   import { Photo } from '@/api/photo/photo'
+  import { getUrl } from '@/utils/request'
   import waves from '@/components/waves' // 水波纹指令
 
   import { Role } from '@/api/system/role'
@@ -114,9 +132,16 @@
           {id:3,name:"亲子"}
         ],
         isDialog:false,
+        isLook:false,
+        photoList:[],
+        dialogImageUrl: '',
+        dialogVisible: false,
         isRoleDialog:false,
+        imageList:[],
+        images:[],//上传的图片集合
         dialogTitle:"",
         dialogData:{},
+        currentPhoto:{},//当前查看的相册
         dialogDataRole:{},
         menuTree: [], //权限菜单树
         carouseRowSize: null,
@@ -167,6 +192,55 @@
           this.total = this.list.length;
         });
       },
+      //关闭查看框
+      cancelLook(){
+        this.isLook = false;
+        this.currentPhoto = {};
+      },
+      //打开查看相册框
+      openLookPhoto(photo){
+        this.listLoading = true;
+        // 发送请求获取相册中的照片
+        this.obj.photo.getPhotoListById(photo.id).then(response => {
+          this.listLoading = false;
+          this.currentPhoto = photo;
+          var data = response.data;
+          this.photoList = data.data.imageList;
+          console.log(this.photoList);
+        });
+        this.isLook = true;
+        console.log(photo);
+      },
+      //照片上传成功触发事件
+      handleSuccess(res,image,imageList){
+        if(res.code===200){
+          let result = res.data;
+          // "packageName"
+          // "version"
+          this.images = imageList;
+
+          Message.success('上传成功！');
+        }else {
+          Message.error(res.msg);
+        }
+      },
+      // 确认上传
+      confirmUpload(){
+        var photoId = this.currentPhoto.id;
+        this.obj.photo.get
+      },
+      //上传路径
+      uploadImgUrl:function () {
+        return getUrl() + "/api/uploadFile?X-Token=" + this.token;
+      },
+      handleRemove(file, fileList) {
+        console.log(file, fileList);
+      },
+      handlePictureCardPreview(file) {
+        this.dialogImageUrl = file.url;
+        console.log(dialogImageUrl+"111");
+        this.dialogVisible = true;
+      },
       getMenuTree(){
         this.obj.menu.getMenuTree(-1).then(response => {
           var data = response.data;
@@ -198,10 +272,6 @@
           this.dialogData.edit = true;
           this.isDialog = true;
         }
-      },
-      //关闭弹框
-      closeDialog(){
-        this.isDialog = false;
       },
       cleanValidate(){
         if(this.$refs["dialogData"]!==undefined){
